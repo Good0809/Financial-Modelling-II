@@ -24,7 +24,7 @@ errors will be returned in any of them are not floats/ints and if si or t is 0.
 '''
 
 #creating the "anonymous functions" for d1 and d2 which will help us in our later endeavors.
-d1 = lambda s,k,r,si,t: (np.log(s/k) + (r - ((si**2)/2)*t))/(si*np.sqrt(t))
+d1 = lambda s,k,r,si,t: (np.log(s/k) + (r + ((si**2)/2)*t))/(si*np.sqrt(t))
 d2 = lambda s,k,r,si,t: d1(s,k,r,si,t) - si*np.sqrt(t) #d2 can call d1 for a simpler calculation.
 
 #call price and put price using the BSM formulas from lecture
