@@ -14,7 +14,7 @@ puttheta(s,k,r,si,t)
 For all functions the variables are in the same. exact. order.
 errors will be returned in any of them are not floats/ints and if si or t is 0.
 '''
-#importing all the lambda functions for the output following binomial tree
+
 #creating the "anonymous functions" for d1 and d2 which will help us in our later endeavors.
 d1 = lambda s,q,k,r,si,t: (np.log(s/k) + ((r-q) + ((si**2)/2)*t))/(si*np.sqrt(t))
 d2 = lambda s,q,k,r,si,t: d1(s,q,k,r,si,t) - si*np.sqrt(t) #d2 can call d1 for a simpler calculation.
@@ -39,7 +39,7 @@ puttheta = lambda s,q,k,r,si,t: -(s*ss.norm.pdf(d1(s,q,k,r,si,t))*si)/(2*np.sqrt
 callrho = lambda s,q,k,r,si,t: k*t*np.exp(-(r-q)*t)*ss.norm.cdf(d2(s,q,k,r,si,t))
 putrho = lambda s,q,k,r,si,t: -k*t*np.exp(-(r-q)*t)*ss.norm.cdf(-d2(s,q,k,r,si,t))
 
-def testgreek(s,q,k,r,si,t): #this is the function we will call to print the greeks
+def testgreek(s,q,k,r,si,t):
     print('deltacall is', deltacall(s,q,k,r,si,t))
     print('deltaput is', deltaput(s,q,k,r,si,t))
     
@@ -53,8 +53,8 @@ def testgreek(s,q,k,r,si,t): #this is the function we will call to print the gre
     print('put rho is', putrho(s,q,k,r,si,t))
 
 def stock_sim(s0,s,u,n,l = 0, m=0,):
-    if m <= l and l<n+1: #this will iterate through for each row and generate the appropriate stock values. For example, s[0,0] = s0 and s[1,2] = s0*u**(4 - 1), so on and so forth
-        s[l,m] = s0*u**(2*m - l) #eventually generating the tree as we know it
+    if m < l+1 and l<n+1:
+        s[m,l] = s0*u**(2*m - l)
         m += 1
         return  stock_sim(s0,s,u,n,l,m)
     elif l < n+1:
@@ -63,7 +63,7 @@ def stock_sim(s0,s,u,n,l = 0, m=0,):
         return stock_sim(s0,s,u,n,l,m)
     else:
         return s
-def step1(s0,k,r,sigma,T,n):
+def step1(s0,k,r,sigma,T,n): #this will get our 
     s = np.zeros([n+1,n+1])
     j = n+1
     dt = T/n
@@ -71,57 +71,60 @@ def step1(s0,k,r,sigma,T,n):
 
     stockprices = stock_sim(s0,s,u,n)
 
-    return stockprices # this just calls the stock prices.... honestly might not be completely necessary but I dont wanna test it now haha
-def pricefind(S,k,Acall, Ecall, Aput, Eput, p, r, q,dt,n, l = 0, m = 0):
-    if m < n and l < n: #these are gonna find the option prices. There seems to be some rounding error on the american call but they otherwise they all have the appropriate values
-        Acall[n - (l+1), m] = max(np.exp(-(r-q)*dt)*((1-p)*Acall[n - l, m] + p*Acall[n-l, m+1]), S[n - (l+1), m] - k)
-        Aput[n - (l+1), m] = max(np.exp(-(r-q)*dt)*((1-p)*Aput[n - l, m] + p*Aput[n-l, m+1]), k - S[n - (l+1), m])
-        
-        Ecall[n - (l+1), m] = max(np.exp(-(r-q)*dt)*((1-p)*Ecall[n - l, m] + p*Ecall[n-l, m+1]), 0)
-        Eput[n - (l+1), m] = max(np.exp(-(r-q)*dt)*((1-p)*Eput[n - l, m] + p*Eput[n-l, m+1]), 0)
+    return stockprices
+def pricefind(S,k,Acall,Call,Ecall, Aput,Put,Eput, p, r, q,dt,n,contput, contcall, conteput, contecall, l = 1, m = 0):
+    x = np.zeros([n+1,n+1])
+    if (l < n+1) and (m < n+1-l):
+        disc = np.exp(-(r-q)*dt)
+        contcall[m] = (Acall[m,-l]*(1-p) + Acall[m+1,-l]*p)* disc
+        contecall[m] = (Ecall[m,-l]*(1-p) + Ecall[m+1,-l]*p)* disc
+        contput[m] = (Aput[m,-l]*(1-p) + Aput[m+1,-l]*p)* disc
+        conteput[m] = (Eput[m,-l]*(1-p) + Eput[m+1,-l]*p)* disc
         m+=1
-        pricefind(S,k,Acall,Ecall,Aput,Eput,p,r,q,dt,n,l,m)
-    if l < n:
+        pricefind(S,k,Acall,Call,Ecall,Aput,Put,Eput,p,r,q,dt,n,contput,contcall,conteput,contecall,l=l,m=m)
+    if l < n+1:
+        Acall[:,-(l+1)] = np.maximum(Call[:,-(l+1)],contcall)
+        Ecall[:,-(l+1)] = np.maximum(x[:,-(l+1)], contecall)
+        Aput[:,-(l+1)] = np.maximum(Put[:,-(l+1)],contput)
+        Eput[:,-(l+1)] = np.maximum(x[:,-(l+1)], conteput)
         m = 0
-        l +=1 #this is gonna reset and move rows
-        return pricefind(S,k,Acall,Ecall,Aput,Eput,p,r,q,dt,n,l,m)
+        l +=1
+        return pricefind(S,k,Acall,Call,Ecall,Aput,Put,Eput,p,r,q,dt,n,contput = np.zeros(n+1), contcall = np.zeros(n+1),conteput = np.zeros(n+1), contecall = np.zeros(n+1),l=l,m=m)
     else:
-        return [Acall, Ecall, Aput, Eput]
-
-
-
+        return [Acall, Aput,Ecall,Eput]
 def finished_product(s0,k,r,q,sigma,T,n):
     j = n+1
-    dt = T/n 
+    dt = T/n
     u = np.exp(sigma*np.sqrt(dt))
-    d= 1/u
-    p = (np.exp((r-q)*dt) -d)/(u-d) #getting all values we need for future functions
+    d=1/u
+    p = (np.exp((r-q)*dt) -d)/(u-d)
     
     stockprices = step1(s0,k,r,sigma,T,n)
     Acall = np.zeros([n+1,n+1])
-    Ecall = np.zeros([n+1,n+1]) #making our zero arrays to be used later
+    Ecall = np.zeros([n+1,n+1])
     Aput = np.zeros([n+1,n+1])
     Eput = np.zeros([n+1,n+1])
     
     Call = np.triu(np.maximum(stockprices - k,0))
-    Put = np.triu(np.maximum(k - stockprices,0)) #our end prices of options, should be the same for both the european and american counterparts
+    Put = np.triu(np.maximum(k - stockprices,0))
+    #print(stockprices)
+    #print('')
     
-    Acall[:,-1] , Ecall[:,-1] = Call[:,-1], Call[:,-1] #assigning aforementioned end prices
+    Acall[:,-1] , Ecall[:,-1] = Call[:,-1], Call[:,-1]
     Aput[:,-1], Eput[:,-1] = Put[:,-1], Put[:,-1]
     
-    finallist = pricefind(stockprices, k, Acall,Ecall,Aput,Eput,p,r,q,dt,n) #getting our end values for the prices
+    finallist = pricefind(stockprices, k, Acall,Call,Ecall,Aput,Put,Eput,p,r,q,dt,n,contput = np.zeros(n+1), contcall = np.zeros(n+1),conteput = np.zeros(n+1), contecall = np.zeros(n+1), l = 1, m = 0)
     
-    amcall = finallist[0][0,0] #assigning values to make printing easier down below
+    amcall = finallist[0][0,0]
     eucall = finallist[1][0,0]
     amput = finallist[2][0,0]
     euput = finallist[3][0,0]
-
-    print('The American Call is ', amcall) 
+    
+    print('The American Call is ', amcall)
     print('The European Call is ', eucall)
     print('The American Put is ', amput)
     print('The European Put is ', euput)
     
-    testgreek(s0,q,k,r,sigma,T) #printing all the greeks
+    testgreek(s0,q,k,r,sigma,T)
     return
-
-finished_product(50,50,0.05,0,0.5,1,6)
+finished_product(50,50,0.02,0.04,0.3,1,6)
