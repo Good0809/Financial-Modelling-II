@@ -228,3 +228,5 @@ def runit(call): #this will be the function that shows two examples, one of a pu
         return finalfunc(StockPrice,StrikePrice,RF,Tenor,cprice,True,theticker)
 
 print(runit(True)) #change this to True of False. True is Call, False is Put.
+#I've noticed that sometimes when you run this program at night you get some really, really weird options from yfinance so be forewarned
+#best results I've gotten from yfinance were around 12-4
