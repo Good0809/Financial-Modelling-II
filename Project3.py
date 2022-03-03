@@ -198,14 +198,14 @@ def finalfunc(s,k,r,T,op,call,ticker): #this is gonna test everything we've done
     hope = lambda x: variables[0] + np.abs(variables[1])*(variables[2]*(x - x[3]) + np.sqrt((x - variables[3])**2 + variables[4]**2))
     if call == True:
         plt.figure(figsize = (15,10)) #just plotting it out with scatters
-        plt.title('Options from ' + ticker + ' with imp vol versus Gatherall SVI Fit')
+        plt.title('Call Options from ' + ticker + ' with imp vol versus Gatherall SVI Fit')
         plt.scatter(options['Call Strikes'], options['Call Vols'], label ='imp vols')
         plt.scatter(options['Call Strikes'], hope(options['Call Strikes']), label = 'Gatheral SVI Skew Fit')
         plt.legend()
         plt.show()
     else:
         plt.figure(figsize = (15,10))#once again just plotting it out
-        plt.title('Options from ' + ticker + ' with imp vol versus Gatherall SVI Fit')
+        plt.title('Put Options from ' + ticker + ' with imp vol versus Gatherall SVI Fit')
         plt.scatter(options['Put Strikes'], options['Put Vols'], label ='imp vols')
         plt.scatter(options['Put Strikes'], hope(options['Put Strikes']), label = 'Gatheral SVI Skew Fit')
         plt.legend()
