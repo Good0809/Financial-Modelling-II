@@ -159,9 +159,12 @@ def GathSVI(tick,options, call): #takes an array of options prices given some pu
             variables = fmin(func, [(options['Put Vols'].max() +options['Put Vols'].min())/2,0,-0.5,options['Put Strikes'].median(),1])
     return variables #returns in order a,b,p,m,sigma
 
-def getoptions(tick): #just gonna get our options using yfinance's option_chain
+def getoptions(tick,date=np.nan): #just gonna get our options using yfinance's option_chain. Including an optional date parameter.
     tickhist = yf.Ticker(tick)
-    net_options = tickhist.option_chain()
+    if type(date) == type(np.nan): 
+        net_options = tickhist.option_chain()
+    else: #if date is invalid this will throw an error
+        net_options = tickhist.option_chain(date)
     #print(net_options)
     #net_options['calls']
     df = pd.DataFrame()
@@ -173,14 +176,15 @@ def getoptions(tick): #just gonna get our options using yfinance's option_chain
     return df #return the dataframe
 
 
-def finalfunc(s,k,r,T,op,call,ticker): #this is gonna test everything we've done so far
+def finalfunc(s,k,r,T,op,call,ticker,date = np.nan): #this is gonna test everything we've done so far
+    #also added the optional date parameter here.
     vols = volfinder(s,k,r,T,op,call) #get our newtonian and bisectional volatilities
     newtonvol, bivol = vols[0],vols[1] #define them here
     
     print('vol using newton for given option price is', newtonvol) #tell the use what they are
     print('vol using bisection for given option price is', bivol)
     
-    options = getoptions(ticker) #getting our dataframe nice and ready
+    options = getoptions(ticker,date) #getting our dataframe nice and ready
     
     variables = GathSVI(ticker,options, call) #finding the paramaters for the Gatheral SVI Skew Fit
     
@@ -221,11 +225,12 @@ Sigma = 0.5
 pprice = putprice(StockPrice,StrikePrice,RF,Sigma,Tenor)
 cprice = callprice(StockPrice,StrikePrice,RF,Sigma,Tenor)
 theticker = 'nflx'
+date = np.nan
 def runit(call): #this will be the function that shows two examples, one of a put and one of a call
     if call == False:
-        return finalfunc(StockPrice,StrikePrice,RF,Tenor,pprice,False,theticker) #it can take a bit because of fmin sadly
+        return finalfunc(StockPrice,StrikePrice,RF,Tenor,pprice,False,theticker,date) #it can take a bit because of fmin sadly
     else:
-        return finalfunc(StockPrice,StrikePrice,RF,Tenor,cprice,True,theticker)
+        return finalfunc(StockPrice,StrikePrice,RF,Tenor,cprice,True,theticker,date)
 
 print(runit(True)) #change this to True of False. True is Call, False is Put.
 #I've noticed that sometimes when you run this program at night you get some really, really weird options from yfinance so be forewarned
