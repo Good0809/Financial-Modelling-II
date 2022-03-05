@@ -225,7 +225,8 @@ Sigma = 0.5
 pprice = putprice(StockPrice,StrikePrice,RF,Sigma,Tenor)
 cprice = callprice(StockPrice,StrikePrice,RF,Sigma,Tenor)
 theticker = 'nflx'
-date = np.nan
+date = np.nan #using nan will simply have yfinance pull the closest expiry
+#date = yf.Ticker(theticker).options[1] #here is an example of a date you could use
 def runit(call): #this will be the function that shows two examples, one of a put and one of a call
     if call == False:
         return finalfunc(StockPrice,StrikePrice,RF,Tenor,pprice,False,theticker,date) #it can take a bit because of fmin sadly
