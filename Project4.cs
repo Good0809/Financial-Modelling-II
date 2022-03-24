@@ -47,7 +47,7 @@ namespace myapp
             Console.WriteLine("Gaussian from Sum Twelve is " + sumtwelvegauss);
             Console.WriteLine("Gaussians from Box Muller are z1 = " + BoxMullerGauss[0] +" , z2 = " + BoxMullerGauss[1]);
             Console.WriteLine("Gaussians from Polar Rejection are z1 = " + PolarRejectionGauss[0] +" , z2 = " + PolarRejectionGauss[1]);
-            Console.WriteLine("Gaussians from correlated are z1 = " + CorrelatedGauss[0] +" , z2 = " +CorrelatedGauss[1]+ " , z3 = " + CorrelatedGauss[2]);
+            Console.WriteLine("Gaussians from correlated are z1 = " + CorrelatedGauss[0] +" , and z2 = " +CorrelatedGauss[1]);
         }
 
         static double sumtwelve(Random x1)
@@ -135,7 +135,6 @@ namespace myapp
             List<double> gaussians = new List<double>();
 
             gaussians.Add(z1); // add them to our list
-            gaussians.Add(z2);
             gaussians.Add(z3);
 
             return gaussians; // return the list
