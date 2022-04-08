@@ -83,7 +83,7 @@ namespace Project5
             {
                 try
                 {
-                    Console.WriteLine("How many steps for your option?");
+                    Console.WriteLine("How many steps for your option? ");
                     steps = int.Parse(Console.ReadLine());
                     done = true;
                 }
@@ -172,8 +172,8 @@ namespace Project5
             //Console.WriteLine(step_payoffs.GetLength(1));
 
             double StdErr = option.StandardError(step_payoffs);
-            double optionDelta = option.optionsDelta(step_payoffs, stockrandsims[0]);
-            double optionGamma = option.optionsGamma(step_payoffs,stockrandsims[0]);
+            double optionDelta = option.optionsDelta(stockrandsims[1], riskfree);
+            double optionGamma = option.optionsGamma(stockrandsims[1], riskfree);
             double optionTheta = option.optionsTheta(step_payoffs);
             double optionVega = option.optionsVega(stockrandsims[1], stockrandsims[0], riskfree);
             double optionRho = option.optionsRho(stockrandsims[1], stockrandsims[0], riskfree);
@@ -181,7 +181,7 @@ namespace Project5
 
             Console.WriteLine("The option price via Monte Carlo is {0}", op_price);
             Console.WriteLine();
-            Console.WriteLine("The StdError of the run was {0}", StdErr);
+            Console.WriteLine("The StdError of the run for payoffs was {0}", StdErr);
             Console.WriteLine();
             Console.WriteLine("The option Delta is {0}", optionDelta);
             Console.WriteLine();
@@ -193,11 +193,6 @@ namespace Project5
             Console.WriteLine();
             Console.WriteLine("The option Rho is {0}", optionRho);
 
-            //for (int x = 0; x < paths; x++)
-            //{
-                //Console.WriteLine(step_payoffs[x, steps-1]);
-            //}
-
         }
 
 
@@ -205,19 +200,25 @@ namespace Project5
     }
     class Gaussian // need a gaussian, might as well make a class that can be modified later for other methods
     {
-        public static double sumtwelve(Random x1) // gonna use the sumtwelve method
+        public static List<double> BoxMuller(Random x1, Random x2)
         {
-            List<double> gaussians = new List<double>();
+            double y1, y2;
+            y1 = x1.NextDouble();
+            y2 = x2.NextDouble(); //get our uniform numbers between 0 and 1
 
-            double k = 0d; //make zero a double using d as Chris showed me. Initial is 0
+            List<double> gaussians = new List<double>(); // our output list of gaussians
 
-            for (int ii = 0; ii < 12; ii++)
-            {
-                k += x1.NextDouble(); // generate 12 numbers on the unit interval between 0 and 1 and that them together
-            }
+            double z1,z2;
 
-            k -= 6d; // once again change 6 to a double so that it can work with the operands 
-            return k;
+            z1 = Math.Sqrt(-2*Math.Log(y1)) *Math.Cos(2*Math.PI*y2); // generate the gaussian using the formulas from slide 52 on lec 8
+            z2 = Math.Sqrt(-2*Math.Log(y1)) *Math.Sin(2*Math.PI*y2);
+
+            gaussians.Add(z1); // add them to the list
+            gaussians.Add(z2);
+
+            return gaussians; // return the list
+
+
         }
     }
     class Stock
@@ -228,10 +229,10 @@ namespace Project5
         public List<double[,]> StockSim(double r, double T, int steps, int paths) // dont want static since it uses the stock characteristics
         {
             double dt = T/Convert.ToDouble(steps);
-            double[,] PricePaths = new double[paths,steps]; // each row should be a path and each column a step
-            double[,] PathRandoms = new double[paths,steps];
+            double[,] PricePaths = new double[paths,steps+1]; // each row should be a path and each column a step
+            double[,] PathRandoms = new double[paths,steps+1];
 
-            for (int x = 0; x < steps;x++)
+            for (int x = 0; x < steps+1;x++)
             {
                 for (int y = 0; y < paths; y++)
                 {
@@ -242,11 +243,14 @@ namespace Project5
                     }
                     else
                     {
-                        Random rand = new Random();
-                        double Gauss = Gaussian.sumtwelve(rand);
+                        Random rand1 = new Random();
+                        Random rand2 = new Random();
+                        double Gauss = Gaussian.BoxMuller(rand1, rand2)[0];
                         PathRandoms[y,x] = Gauss;
 
-                        PricePaths[y,x] = PricePaths[y,x-1]*Math.Exp((r - (Math.Pow(Vol, 2))/2)*dt + Vol*Math.Sqrt(dt)*PathRandoms[y,x]);
+                        //Console.WriteLine("Random from path {0}, step {1} is {2}", y, x, PathRandoms[y,x]); // confirm each gaussian is unique
+
+                        PricePaths[y,x] = PricePaths[y,x-1]*Math.Exp((r - (Math.Pow(Vol, 2))/2.0)*dt + Vol*Math.Sqrt(dt)*PathRandoms[y,x]);
                     }
                 }
             }
@@ -278,16 +282,16 @@ namespace Project5
             {
                 if(Call)
                 {
-                    payoffs.Add(Math.Max(simmedstock[x, steps-1] - Strike, 0d)); // last column is the last step. So we want to iterate through rows
+                    payoffs.Add(Math.Max(simmedstock[x, steps-1] - Strike, 0d)*Math.Exp(-r * Tenor)); // last column is the last step. So we want to iterate through rows
                     //count++;
                     //Console.WriteLine(count);
                 }
                 else
                 {
-                    payoffs.Add(Math.Max(Strike - simmedstock[x,steps-1],0d));
+                    payoffs.Add(Math.Max(Strike - simmedstock[x,steps-1],0d)*Math.Exp(-r * Tenor));
                 }
             }
-            return payoffs.Average()*Math.Exp(-r * Tenor);
+            return payoffs.Average();
         }
 
         public double[,] steppayoff(double[,] simmedstock, double r) //array of payoffs which will help us with calculating Greeks
@@ -314,66 +318,180 @@ namespace Project5
             }
             return oppayoffs; //return the discounted payoffs
         }
-        // the following Greeks formulas are from Lecture 4 slides 45,46
-        public double optionsDelta(double[,] oppayoffs, double[,] stocks)
+        // the following Greeks formulas are from Lecture 4 slides 45,46 as well as lecture 10 slides 31-33
+        public double optionsDelta(double[,] randoms, double r)
         {
-            int steps = oppayoffs.GetLength(1);
-            int paths = oppayoffs.GetLength(0);
+            int steps = randoms.GetLength(1);
+            int paths = randoms.GetLength(0);
+            double dt = Tenor/Convert.ToDouble(steps);
             //double[,] deltas = new double[paths, steps-1];
-            double delta = 0;
-
-            for (int x = 0; x<paths;x++)
+            List<double> deltas = new List<double>();
+            double v = Underlying.Vol;
+            double changeS = (1.0/1000.0)*Underlying.Value;
+            //int count = 0;
+            double[,] upperstock = new double[paths,steps];
+            double[,] lowerstock = new double[paths,steps];
+            for (int x = 0; x < steps;x++)
             {
-                for (int y = 0; y<steps-1;y++)
+                for (int y = 0; y < paths; y++)
                 {
-                    delta += (oppayoffs[x,y+1] - oppayoffs[x,y])/(stocks[x,y+1]- stocks[x,y]);
+                    if (x == 0)
+                    {
+                        //Console.WriteLine(0);
+                        upperstock[y,x] = Underlying.Value + changeS; // each initial step of each path is value and their random is 0
+                        lowerstock[y,x] = Underlying.Value - changeS;
+                    }
+                    else
+                    {
+                        //count+=1;
+                        //Console.WriteLine(count);
+
+                        upperstock[y,x] = (upperstock[y,x-1])*Math.Exp((r - (Math.Pow(v, 2))/2.0)*dt + (Underlying.Vol)*Math.Sqrt(dt)*randoms[y,x]);
+                        lowerstock[y,x] = (lowerstock[y,x-1])*Math.Exp((r - (Math.Pow(v, 2))/2.0)*dt + (Underlying.Vol)*Math.Sqrt(dt)*randoms[y,x]);
+                    }
                 }
             }
-            int elements = (steps-1)*paths;
-            double averagedelta = delta/elements; //average delta
+            double[,] upperpayoffs = new double[paths,steps];
+            double[,] lowerpayoffs = new double[paths,steps];
+            for (int x = 0; x < paths; x++)
+            {
+                for (int y = 0; y<steps; y++)
+                {
+                    if (Call)
+                    {
+                        upperpayoffs[x,y] = Math.Max(upperstock[x,y] - Strike, 0)*Math.Exp(-(r)*dt*y);
+                        lowerpayoffs[x,y] = Math.Max(lowerstock[x,y] - Strike,0)*Math.Exp(-(r)*dt*y);
+                    }
+                    else
+                    {
+                        upperpayoffs[x,y] = Math.Max(Strike - upperstock[x,y], 0)*Math.Exp(-(r)*dt*y);
+                        lowerpayoffs[x,y] = Math.Max(Strike - lowerstock[x,y],0)*Math.Exp(-(r)*dt*y);
+                    }
 
-            return averagedelta;
+                }
+            }
+            for (int x = 0; x < paths; x++)
+            {
+                //PricePaths[y,x] = PricePaths[y,x-1]*Math.Exp((r - (Math.Pow(Vol, 2))/2)*dt + Vol*Math.Sqrt(dt)*PathRandoms[y,x]);
+                for (int y = 1; y <steps; y++)
+                {
+                    double k = upperpayoffs[x,y] -lowerpayoffs[x,y];
+                    double j = 2.0*changeS;
+                    //Console.WriteLine(k);
+                    deltas.Add(k/j);
+                    //Console.WriteLine(vegalist.Count());
+                    //Console.WriteLine(vegalist[count]);
+                    //count +=1;
+
+                }
+            }
+            double avgdelta = deltas.Average();
+
+            return avgdelta;
         }
 
-        public double optionsGamma(double[,] oppayoffs, double[,] stocks)
+        public double optionsGamma(double[,] randoms, double r)
         {
-            int steps = oppayoffs.GetLength(1);
-            int paths = oppayoffs.GetLength(0);
+            int steps = randoms.GetLength(1);
+            int paths = randoms.GetLength(0);
             //double[,] gammas = new double[paths, steps-2];
-            double gamma = 0;
-
-            for (int x = 0; x < paths ; x++)
+            double dt = Tenor/Convert.ToDouble(steps);
+            //double[,] deltas = new double[paths, steps-1];
+            List<double> gammas = new List<double>();
+            double v = Underlying.Vol;
+            double changeS = (1.0/100.0)*Underlying.Value;
+            //int count = 0;
+            double[,] upperstock = new double[paths,steps];
+            double[,] regstock = new double[paths,steps];
+            double[,] lowerstock = new double[paths,steps];
+            for (int x = 0; x < steps;x++)
             {
-                for (int y = 0; y < steps-2; y++)
+                for (int y = 0; y < paths; y++)
                 {
-                    gamma += Convert.ToDouble(((oppayoffs[x, y+2] - oppayoffs[x, y+1])/(stocks[x,y+2] - stocks[x,y+1]) - ((oppayoffs[x, y+1] - oppayoffs[x, y])/(stocks[x,y+1] - stocks[x,y])))/((1.0/2.0)*(stocks[x,y+2] - stocks[x,y])));
-                    //Console.WriteLine(gamma);
+                    if (x == 0)
+                    {
+                        //Console.WriteLine(0);
+                        upperstock[y,x] = Underlying.Value + changeS;
+                        regstock[y,x] = Underlying.Value;
+                        lowerstock[y,x] = Underlying.Value - changeS;
+                    }
+                    else
+                    {
+                        //count+=1;
+                        //Console.WriteLine(count);
+
+                        upperstock[y,x] = (upperstock[y,x-1])*Math.Exp((r - (Math.Pow(v, 2))/2.0)*dt + (Underlying.Vol)*Math.Sqrt(dt)*randoms[y,x]);
+                        regstock[y,x] = (regstock[y,x-1])*Math.Exp((r - (Math.Pow(v, 2))/2.0)*dt + (Underlying.Vol)*Math.Sqrt(dt)*randoms[y,x]);
+                        lowerstock[y,x] = (lowerstock[y,x-1])*Math.Exp((r - (Math.Pow(v, 2))/2.0)*dt + (Underlying.Vol)*Math.Sqrt(dt)*randoms[y,x]);
+                    }
                 }
             }
-            double dpaths = Convert.ToDouble(paths);
-            double dsteps = Convert.ToDouble(steps);
+            double[,] upperpayoffs = new double[paths,steps];
+            double[,] regpayoffs = new double[paths,steps];
+            double[,] lowerpayoffs = new double[paths,steps];
+            for (int x = 0; x < paths; x++)
+            {
+                for (int y = 0; y<steps; y++)
+                {
+                    if (Call)
+                    {
+                        upperpayoffs[x,y] = Math.Max(upperstock[x,y] - Strike, 0)*Math.Exp(-(r)*dt*y);
+                        regpayoffs[x,y] = Math.Max(regstock[x,y] - Strike, 0)*Math.Exp(-(r)*dt*y);
+                        lowerpayoffs[x,y] = Math.Max(lowerstock[x,y] - Strike,0)*Math.Exp(-(r)*dt*y);
+                    }
+                    else
+                    {
+                        upperpayoffs[x,y] = Math.Max(Strike - upperstock[x,y], 0)*Math.Exp(-(r)*dt*y);
+                        regpayoffs[x,y] = Math.Max(Strike - regstock[x,y], 0)*Math.Exp(-(r)*dt*y);
+                        lowerpayoffs[x,y] = Math.Max(Strike - lowerstock[x,y],0)*Math.Exp(-(r)*dt*y);
+                    }
 
-            double averagegamma = (gamma)/(dpaths*(dsteps-2.0));
-            return averagegamma;
+                }
+            }
+            for (int x = 0; x < paths; x++)
+            {
+                //PricePaths[y,x] = PricePaths[y,x-1]*Math.Exp((r - (Math.Pow(Vol, 2))/2)*dt + Vol*Math.Sqrt(dt)*PathRandoms[y,x]);
+                for (int y = 1; y <steps; y++)
+                {
+                    double k = upperpayoffs[x,y] - 2.0*regpayoffs[x,y] + lowerpayoffs[x,y];
+                    double j = Math.Pow(changeS,2);
+                    //Console.WriteLine(k);
+                    gammas.Add(k/j);
+                    //Console.WriteLine(vegalist.Count());
+                    //Console.WriteLine(vegalist[count]);
+                    //count +=1;
+
+                }
+            }
+            double avggamma = gammas.Average();
+
+            return avggamma;
         }
 
-        public double optionsTheta(double[,] oppayoffs)
+        public double optionsTheta(double[,] opvals)
         {
-            int steps = oppayoffs.GetLength(1);
-            int paths = oppayoffs.GetLength(0);
-            //double[,] thetas = new double[paths, steps-2];
-            double theta = 0;
-            double dt = Tenor/steps;
-
-            for (int x = 0; x<paths;x++)
+            int steps = opvals.GetLength(1);
+            int paths = opvals.GetLength(0);
+            double dsteps = Convert.ToDouble(steps);
+            double dt = Tenor/dsteps;
+            double v = Underlying.Vol;
+            List<double> thetalist = new List<double>();
+            //int count = 0;
+            for (int x = 0; x < paths; x++)
             {
-                for (int y = 0; y<steps-2; y++)
+                //PricePaths[y,x] = PricePaths[y,x-1]*Math.Exp((r - (Math.Pow(Vol, 2))/2)*dt + Vol*Math.Sqrt(dt)*PathRandoms[y,x]);
+                for (int y = 0; y <steps-1; y++)
                 {
-                    theta += (oppayoffs[x,y+2] - oppayoffs[x,y])/(2*dt);
+                    thetalist.Add((opvals[x,y+1] - opvals[x,y])/(dt));
+                    //Console.WriteLine(vegalist.Count());
+                    //Console.WriteLine(vegalist[count]);
+                    //count +=1;
+
                 }
             }
-            double averagetheta = theta/((steps-2)*paths);
-            return averagetheta;
+            double averagetheta = thetalist.Average();
+
+            return averagetheta*-1.0;
         }
 
         public double optionsVega(double[,] randoms, double[,] stockvals, double r)
@@ -381,25 +499,60 @@ namespace Project5
             int steps = randoms.GetLength(1);
             int paths = randoms.GetLength(0);
             double dt = Tenor/steps;
-            double upperpath;
-            double lowerpath;
             List<double> vegalist = new List<double>();
             double v = Underlying.Vol;
-            double deltavol = (1/10.0)*v;
+            double deltavol = (1/100.0)*v;
             //int count = 0;
+            double[,] upperstock = new double[paths,steps];
+            double[,] lowerstock = new double[paths,steps];
+            for (int x = 0; x < steps;x++)
+            {
+                for (int y = 0; y < paths; y++)
+                {
+                    if (x == 0)
+                    {
+                        //Console.WriteLine(0);
+                        upperstock[y,x] = Underlying.Value; // each initial step of each path is value and their random is 0
+                        lowerstock[y,x] = Underlying.Value;
+                    }
+                    else
+                    {
+                        //count+=1;
+                        //Console.WriteLine(count);
+
+                        upperstock[y,x] = upperstock[y,x-1]*Math.Exp((r - (Math.Pow(v + deltavol, 2))/2.0)*dt + (Underlying.Vol+deltavol)*Math.Sqrt(dt)*randoms[y,x]);
+                        lowerstock[y,x] = lowerstock[y,x-1]*Math.Exp((r - (Math.Pow(v - deltavol, 2))/2.0)*dt + (Underlying.Vol-deltavol)*Math.Sqrt(dt)*randoms[y,x]);
+                    }
+                }
+            }
+            double[,] upperpayoffs = new double[paths,steps];
+            double[,] lowerpayoffs = new double[paths,steps];
+            for (int x = 0; x < paths; x++)
+            {
+                for (int y = 0; y<steps; y++)
+                {
+                    if (Call)
+                    {
+                        upperpayoffs[x,y] = Math.Max(upperstock[x,y] - Strike, 0)*Math.Exp(-r*dt*y);
+                        lowerpayoffs[x,y] = Math.Max(lowerstock[x,y] - Strike,0)*Math.Exp(-r*dt*y);
+                    }
+                    else
+                    {
+                        upperpayoffs[x,y] = Math.Max(Strike - upperstock[x,y], 0)*Math.Exp(-r*dt*y);
+                        lowerpayoffs[x,y] = Math.Max(Strike - lowerstock[x,y],0)*Math.Exp(-r*dt*y);
+                    }
+
+                }
+            }
             for (int x = 0; x < paths; x++)
             {
                 //PricePaths[y,x] = PricePaths[y,x-1]*Math.Exp((r - (Math.Pow(Vol, 2))/2)*dt + Vol*Math.Sqrt(dt)*PathRandoms[y,x]);
-                for (int y = 1; y <steps; y++)
+                for (int y = 0; y <steps; y++)
                 {
-                    upperpath = Math.Max(stockvals[x,y-1]*Math.Exp((r - (Math.Pow(v + deltavol, 2))/2)*dt + (v + deltavol)*Math.Sqrt(dt)*randoms[x,y]) - Strike,0);
-                    lowerpath = Math.Max(stockvals[x,y-1]*Math.Exp((r - (Math.Pow(v - deltavol, 2))/2)*dt + (v - deltavol)*Math.Sqrt(dt)*randoms[x,y]) - Strike,0);
-                    //Console.WriteLine(upperpath);
-                    //Console.WriteLine(lowerpath);
-                    double k = upperpath*1.0 -lowerpath*1.0;
+                    double k = upperpayoffs[x,y] -lowerpayoffs[x,y];
                     double j = 2.0*deltavol;
                     //Console.WriteLine(k);
-                    vegalist.Add(k*(1.0/j));
+                    vegalist.Add(k/j);
                     //Console.WriteLine(vegalist.Count());
                     //Console.WriteLine(vegalist[count]);
                     //count +=1;
@@ -413,25 +566,66 @@ namespace Project5
 
         public double optionsRho(double[,] randoms, double[,] stockvals, double r)
         {
-            int steps = randoms.GetLength(1);
-            int paths = randoms.GetLength(0);
+            int steps = stockvals.GetLength(1);
+            int paths = stockvals.GetLength(0);
             double dt = Tenor/steps;
-            double upperpath;
-            double lowerpath;
             List<double> rholist = new List<double>();
             double v = Underlying.Vol;
-            double deltar = (1/10.0)*r;
+            double deltar = (1/100.0)*r;
             //int count = 0;
+            double[,] upperstock = new double[paths,steps];
+            double[,] lowerstock = new double[paths,steps];
+            for (int x = 0; x < steps;x++)
+            {
+                for (int y = 0; y < paths; y++)
+                {
+                    if (x == 0)
+                    {
+                        //Console.WriteLine(0);
+                        upperstock[y,x] = Underlying.Value; // each initial step of each path is value and their random is 0
+                        lowerstock[y,x] = Underlying.Value;
+                    }
+                    else
+                    {
+                        //count+=1;
+                        //Console.WriteLine(count);
+
+                        upperstock[y,x] = upperstock[y,x-1]*Math.Exp((r+deltar - (Math.Pow(Underlying.Vol, 2))/2.0)*dt + Underlying.Vol*Math.Sqrt(dt)*randoms[y,x]);
+                        lowerstock[y,x] = lowerstock[y,x-1]*Math.Exp((r-deltar - (Math.Pow(Underlying.Vol, 2))/2.0)*dt + Underlying.Vol*Math.Sqrt(dt)*randoms[y,x]);
+                    }
+                }
+            }
+            double[,] upperpayoffs = new double[paths,steps];
+            double[,] lowerpayoffs = new double[paths,steps];
+            for (int x = 0; x < paths; x++)
+            {
+                for (int y = 0; y<steps; y++)
+                {
+                    if (Call == true)
+                    {
+                        upperpayoffs[x,y] = Math.Max(upperstock[x,y] - Strike, 0)*Math.Exp(-(r+deltar)*dt*y);
+                        lowerpayoffs[x,y] = Math.Max(lowerstock[x,y] - Strike,0)*Math.Exp(-(r-deltar)*dt*y);
+                    }
+                    else
+                    {
+                        upperpayoffs[x,y] = Math.Max(Strike - upperstock[x,y], 0)*Math.Exp(-(r+deltar)*dt*y);
+                        lowerpayoffs[x,y] = Math.Max(Strike - lowerstock[x,y],0)*Math.Exp(-(r-deltar)*dt*y);
+                    }
+
+                }
+            }
+            
             for (int x = 0; x < paths; x++)
             {
                 //PricePaths[y,x] = PricePaths[y,x-1]*Math.Exp((r - (Math.Pow(Vol, 2))/2)*dt + Vol*Math.Sqrt(dt)*PathRandoms[y,x]);
-                for (int y = 1; y <steps; y++)
+                for (int y = 0; y <steps; y++)
                 {
-                    upperpath = Math.Max(stockvals[x,y-1]*Math.Exp((r - (Math.Pow(v + deltar, 2))/2)*dt + (v + deltar)*Math.Sqrt(dt)*randoms[x,y]) - Strike,0);
-                    lowerpath = Math.Max(stockvals[x,y-1]*Math.Exp((r - (Math.Pow(v - deltar, 2))/2)*dt + (v - deltar)*Math.Sqrt(dt)*randoms[x,y]) - Strike,0);
+                    //upperpath = Math.Max(stockvals[x,y]*Math.Exp(( (r+deltar) - (Math.Pow(v, 2))/2.0)*dt + (v)*Math.Sqrt(dt)*randoms[x,y]) - Strike,0);
+                    //lowerpath = Math.Max(stockvals[x,y]*Math.Exp(( (r-deltar) - (Math.Pow(v, 2))/2.0)*dt + (v)*Math.Sqrt(dt)*randoms[x,y]) - Strike,0);
                     //Console.WriteLine(upperpath);
                     //Console.WriteLine(lowerpath);
-                    double k = upperpath*1.0 - lowerpath*1.0;
+                    //double k = upperpath - lowerpath;
+                    double k = upperpayoffs[x,y] - lowerpayoffs[x,y];
                     //Console.WriteLine(k);
                     rholist.Add((k)/(2.0*deltar));
                     //Console.WriteLine(rholist.Count());
@@ -440,7 +634,7 @@ namespace Project5
 
                 }
             }
-            double averagerho = rholist.Average();
+            double averagerho = rholist.Average(); // annualized
 
             return averagerho;
         }
@@ -462,7 +656,7 @@ namespace Project5
             {
                 //double outscome = (1/(paths-1))*Math.Pow(pathpayoff[x] - avgpayoff,2);
                 //Console.WriteLine(outscome);
-                standardeviation += Convert.ToDouble((1/(dpaths-1)))*Convert.ToDouble(Math.Pow(pathpayoff[x] - avgpayoff,2));
+                standardeviation += Convert.ToDouble((1.0/(dpaths-1.0)))*Convert.ToDouble(Math.Pow(pathpayoff[x] - avgpayoff,2));
             }
             double SE = Math.Sqrt(standardeviation/dpaths);
 
