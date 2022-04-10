@@ -501,7 +501,7 @@ namespace Project5
             double dt = Tenor/steps;
             List<double> vegalist = new List<double>();
             double v = Underlying.Vol;
-            double deltavol = (1/100.0)*v;
+            double deltavol = (1/1000.0)*v;
             //int count = 0;
             double[,] upperstock = new double[paths,steps];
             double[,] lowerstock = new double[paths,steps];
@@ -520,8 +520,8 @@ namespace Project5
                         //count+=1;
                         //Console.WriteLine(count);
 
-                        upperstock[y,x] = upperstock[y,x-1]*Math.Exp((r - (Math.Pow(v + deltavol, 2))/2.0)*dt + (Underlying.Vol+deltavol)*Math.Sqrt(dt)*randoms[y,x]);
-                        lowerstock[y,x] = lowerstock[y,x-1]*Math.Exp((r - (Math.Pow(v - deltavol, 2))/2.0)*dt + (Underlying.Vol-deltavol)*Math.Sqrt(dt)*randoms[y,x]);
+                        upperstock[y,x] = upperstock[y,x-1]*Math.Exp((r - (Math.Pow(v + deltavol, 2))/2.0)*dt + (v+deltavol)*Math.Sqrt(dt)*randoms[y,x]);
+                        lowerstock[y,x] = lowerstock[y,x-1]*Math.Exp((r - (Math.Pow(v - deltavol, 2))/2.0)*dt + (v-deltavol)*Math.Sqrt(dt)*randoms[y,x]);
                     }
                 }
             }
@@ -571,7 +571,7 @@ namespace Project5
             double dt = Tenor/steps;
             List<double> rholist = new List<double>();
             double v = Underlying.Vol;
-            double deltar = (1/100.0)*r;
+            double deltar = (1/1000.0)*r;
             //int count = 0;
             double[,] upperstock = new double[paths,steps];
             double[,] lowerstock = new double[paths,steps];
@@ -590,8 +590,8 @@ namespace Project5
                         //count+=1;
                         //Console.WriteLine(count);
 
-                        upperstock[y,x] = upperstock[y,x-1]*Math.Exp((r+deltar - (Math.Pow(Underlying.Vol, 2))/2.0)*dt + Underlying.Vol*Math.Sqrt(dt)*randoms[y,x]);
-                        lowerstock[y,x] = lowerstock[y,x-1]*Math.Exp((r-deltar - (Math.Pow(Underlying.Vol, 2))/2.0)*dt + Underlying.Vol*Math.Sqrt(dt)*randoms[y,x]);
+                        upperstock[y,x] = upperstock[y,x-1]*Math.Exp((r+deltar - (Math.Pow(v, 2))/2.0)*dt + v*Math.Sqrt(dt)*randoms[y,x]);
+                        lowerstock[y,x] = lowerstock[y,x-1]*Math.Exp((r-deltar - (Math.Pow(v, 2))/2.0)*dt + v*Math.Sqrt(dt)*randoms[y,x]);
                     }
                 }
             }
@@ -614,27 +614,54 @@ namespace Project5
 
                 }
             }
-            
-            for (int x = 0; x < paths; x++)
+            int count = 0;
+            List<double> upplist = new List<double>();
+            List<double> lowlist = new List<double>();
+            /*for (int x = 0; x < paths; x++)
             {
                 //PricePaths[y,x] = PricePaths[y,x-1]*Math.Exp((r - (Math.Pow(Vol, 2))/2)*dt + Vol*Math.Sqrt(dt)*PathRandoms[y,x]);
                 for (int y = 0; y <steps; y++)
                 {
+                    count += 1;
+                    Console.WriteLine(count);
+                    Console.WriteLine(upperpayoffs[x,y]);
+                    Console.WriteLine(lowerpayoffs[x,y]);
                     //upperpath = Math.Max(stockvals[x,y]*Math.Exp(( (r+deltar) - (Math.Pow(v, 2))/2.0)*dt + (v)*Math.Sqrt(dt)*randoms[x,y]) - Strike,0);
                     //lowerpath = Math.Max(stockvals[x,y]*Math.Exp(( (r-deltar) - (Math.Pow(v, 2))/2.0)*dt + (v)*Math.Sqrt(dt)*randoms[x,y]) - Strike,0);
                     //Console.WriteLine(upperpath);
                     //Console.WriteLine(lowerpath);
                     //double k = upperpath - lowerpath;
-                    double k = upperpayoffs[x,y] - lowerpayoffs[x,y];
+                    //double k = upperpayoffs[x,y] - lowerpayoffs[x,y];
+                    //rholist.Add(k);
                     //Console.WriteLine(k);
-                    rholist.Add((k)/(2.0*deltar));
+                    //rholist.Add((k)/(2.0*deltar));
                     //Console.WriteLine(rholist.Count());
                     //Console.WriteLine(vegalist[count]);
                     //count +=1;
 
                 }
+            }*/
+            //Console.WriteLine("check2");
+
+            for (int x = 0; x<paths; x++)
+            {
+                if (x==0)
+                {
+                    //Console.WriteLine("check3");
+                }
+                for (int y = 0; y<steps;y++)
+                {
+                    //upplist.Add(upperpayoffs[x,y]);
+                    Console.WriteLine(upperpayoffs[x,y]);
+                    //lowlist.Add(lowerpayoffs[x,y]);
+                    Console.WriteLine(lowerpayoffs[x,y]);
+                }
             }
-            double averagerho = rholist.Average(); // annualized
+
+            double avgupper = upplist.Average();
+            double avglower = lowlist.Average();
+            double k1 = avgupper - avglower;
+            double averagerho = k1/(2.0*deltar); // annualized
 
             return averagerho;
         }
