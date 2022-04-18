@@ -10,7 +10,7 @@ namespace Project6
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("check");
+            //Console.WriteLine("check");
             Boolean done = false;
             double ival = 100d;
             while (!done)
@@ -206,6 +206,7 @@ namespace Project6
             double drho = rfree/1000.0;
             double erho = e.OpRho(drho, rands,rfree,T,isanti);
             string opname = "dumbdumb";
+            double stderror = e.StandardError(sa, rfree, isanti);
             if(iscall)
             {
                 opname = "European Call";
@@ -221,6 +222,7 @@ namespace Project6
             Console.WriteLine("It's Vega is approximately {0} \n",evega);
             Console.WriteLine("It's Theta is approximately {0} \n", etheta);
             Console.WriteLine("It's Rho is approximately {0} \n", erho);
+            Console.WriteLine("The Standard Error of the run was {0}", stderror);
 
 
         }
@@ -458,6 +460,58 @@ namespace Project6
 
             double rho = (upper - lower)/(2.0*dval);
             return rho;
+        }
+
+        public double StandardError(List<double[,]> simmedstocks, double r, Boolean isanti)
+        {
+            int rows = simmedstocks[0].GetLength(0);
+            int columns = simmedstocks[0].GetLength(1);
+            double varsum = 0.0;
+            if(isanti)
+            {
+                List<double[,]> antivals = new List<double[,]>();
+                antivals.Add(simmedstocks[1]);
+                for(int y=0;y<columns;y++)
+                {
+                    double column_mean_anti = PriceViaMonte(antivals, r, false);
+                    double column_mean = PriceViaMonte(simmedstocks, r, false);
+                    double temp1 = 0;
+                    double temp2 = 0;
+                    for(int x = 0; x < rows; x++)
+                    {
+                        temp1 += Math.Pow(simmedstocks[0][x,y] - column_mean,2);
+                        temp2 += Math.Pow(simmedstocks[1][x,y] - column_mean_anti,2);
+                        if(x == (rows-1))
+                        {
+                            varsum += (temp1/columns)/2.0 + (temp2/columns)/2.0;
+                        }
+                    }
+
+                }
+                double std = Math.Sqrt((1.0/2.0) * varsum * Math.Exp(-r*Tenor));
+                double SE = Math.Sqrt(std/rows);
+                return SE;
+            }
+            else
+            {
+                for(int y=0;y<columns;y++)
+                {
+                    double column_mean = PriceViaMonte(simmedstocks, r, false);
+                    double temp1 = 0;
+                    for(int x = 0; x < rows; x++)
+                    {
+                        temp1 += Math.Pow(simmedstocks[0][x,y] - column_mean,2);
+                        if(x == (rows-1))
+                        {
+                            varsum += temp1;
+                        }
+                    }
+                }
+                double std = Math.Sqrt(varsum/columns);
+                double SE = Math.Sqrt(std/rows);
+                return SE;
+            }
+
         }
     }
 
