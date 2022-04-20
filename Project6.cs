@@ -206,7 +206,7 @@ namespace Project6
             double drho = rfree/1000.0;
             double erho = e.OpRho(drho, rands,rfree,T,isanti);
             string opname = "dumbdumb";
-            double stderror = e.StandardError(sa, rfree, isanti);
+            //double stderror = e.StandardError(sa, rfree, isanti);
             if(iscall)
             {
                 opname = "European Call";
@@ -222,7 +222,7 @@ namespace Project6
             Console.WriteLine("It's Vega is approximately {0} \n",evega);
             Console.WriteLine("It's Theta is approximately {0} \n", etheta);
             Console.WriteLine("It's Rho is approximately {0} \n", erho);
-            Console.WriteLine("The Standard Error of the run was {0}", stderror);
+            //Console.WriteLine("The Standard Error of the run was {0}", stderror);
 
 
         }
@@ -249,7 +249,7 @@ namespace Project6
             return gaussians; // return the list
         }
 
-        public static double[,] GenerateNorms(int rows, int columns)
+        public static double[,] GenerateNorms(int rows, int columns) //make the randoms outside of the functions to try and solve the greeks/stocks w/out issues of last project
         {
             double[,] rands = new double[rows,columns+1];
             for (int x = 0; x<rows; x++)
@@ -267,6 +267,7 @@ namespace Project6
         }
     }
 
+    //the equations for stocks and greeks are pulled from lectures 10 and 12
     class Stock
     {
         public double Value {get;set;}
@@ -327,11 +328,11 @@ namespace Project6
 
     class EuroOption
     {
-        public Stock Underlying {get;set;}
-        public double Tenor {get;set;}
+        public Stock Underlying {get;set;} //inherit the underlying
+        public double Tenor {get;set;} // each european option has a tenor, strike, and type (call/put)
         public double Strike {get;set;}
         public Boolean Call {get;set;}
-
+        // most of these are pulled from my last project and modified to fit anti-thetical runs. Modified as well to take randoms and use priveviamonte function w/efficency
         public double PriceViaMonte(List<double[,]> simmedstocks,double r, Boolean isanti, double dt = 0) // simmed stocks will either have just the regular stocks sims or that + antis
         {
             double price;
@@ -376,7 +377,7 @@ namespace Project6
 
                 price = avgprice/(rows);
                 return price;
-            }
+            } 
 
         }
         public double OpDelta(double dval, double[,] rands, double r, double Tenor, Boolean isanti)
