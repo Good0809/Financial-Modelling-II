@@ -206,7 +206,7 @@ namespace Project6
             double drho = rfree/1000.0;
             double erho = e.OpRho(drho, rands,rfree,T,isanti);
             string opname = "dumbdumb";
-            //double stderror = e.StandardError(sa, rfree, isanti);
+            double stderror = e.StandardError(sa, rfree, isanti);
             if(iscall)
             {
                 opname = "European Call";
@@ -222,7 +222,7 @@ namespace Project6
             Console.WriteLine("It's Vega is approximately {0} \n",evega);
             Console.WriteLine("It's Theta is approximately {0} \n", etheta);
             Console.WriteLine("It's Rho is approximately {0} \n", erho);
-            //Console.WriteLine("The Standard Error of the run was {0}", stderror);
+            Console.WriteLine("The Standard Error of the run was {0}", stderror);
 
 
         }
